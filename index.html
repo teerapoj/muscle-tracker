@@ -812,6 +812,22 @@
     <div id="sync-last" style="font-size:11px;color:var(--muted);text-align:center;margin-top:4px"></div>
   </div>
 
+  <div class="card" style="margin-top:14px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <span style="font-size:22px">🤖</span>
+      <div>
+        <div style="font-weight:700;font-size:15px">ถาม Claude Chat</div>
+        <div style="font-size:12px;color:var(--muted)">Copy ข้อมูลทั้งหมด → วางในแชท → ถามได้เลย</div>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="copy-summary-btn" onclick="copySummary()">📋 Copy ข้อมูลสรุปทั้งหมด</button>
+    <div id="copy-summary-status" style="font-size:13px;text-align:center;margin-top:8px;min-height:18px"></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.6">
+      หลังจาก Copy แล้ว ไปที่ claude.ai → วาง → พิมพ์ว่า<br>
+      <strong style="color:var(--accent)">"ช่วยวิเคราะห์ข้อมูลออกกำลังกายของฉันหน่อย"</strong>
+    </div>
+  </div>
+
   <button class="btn btn-secondary mt-12" onclick="openEditProfile()">แก้ไขข้อมูล</button>
   <button class="btn btn-danger" style="margin-top:10px" onclick="confirmReset()">รีเซ็ตข้อมูลทั้งหมด</button>
 </div>
@@ -2533,6 +2549,7 @@ function doPost(e) {
     writeWaterLog(ss, data.waterLog || {});
     writeCardioLog(ss, data.cardioLog || []);
     writeMeasureLog(ss, data.measureLog || []);
+    writeSummary(ss, data);
     lock.releaseLock();
     return ContentService
       .createTextOutput(JSON.stringify({ok:true}))
@@ -2648,7 +2665,222 @@ function writeMeasureLog(ss, log) {
   sh.getRange(1,1,1,7).setValues([['วันที่','อก','เอว','แขน L','แขน R','สะโพก','ต้นขา']]);
   const rows = log.map(e=>[e.date,e.chest||'',e.waist||'',e.armL||'',e.armR||'',e.hip||'',e.thigh||'']);
   if (rows.length) sh.getRange(2,1,rows.length,7).setValues(rows);
+}
+
+function writeSummary(ss, data) {
+  const sh = getSheet(ss, '📋 Summary (อ่านอันนี้อันเดียว)');
+  sh.clearContents();
+  const p = data.profile || {};
+  const bmr = p.sex==='male'
+    ? Math.round(10*p.weight+6.25*p.height-5*p.age+5)
+    : Math.round(10*p.weight+6.25*p.height-5*p.age-161);
+  const tdee = Math.round(bmr*(p.activityFactor||1.375));
+  const target = tdee+400;
+  const protein = Math.round((p.weight||65)*2);
+
+  const wLog = data.weightLog || {};
+  const weightEntries = Object.entries(wLog).sort(([a],[b])=>a.localeCompare(b));
+  const curWeight = weightEntries.length ? weightEntries[weightEntries.length-1][1] : p.weight;
+  const startWeight = p.startWeight || p.weight;
+  const gained = curWeight - startWeight;
+
+  const rows = [];
+  const H = (t) => [t,'','',''];
+  const R = (k,v) => [k,v,'',''];
+  const BLANK = ['','','',''];
+
+  // ── SECTION 1: โปรไฟล์
+  rows.push(['=== โปรไฟล์ ===','','','']);
+  rows.push(R('ชื่อ', p.name||''));
+  rows.push(R('อายุ', p.age+' ปี'));
+  rows.push(R('ส่วนสูง', p.height+' cm'));
+  rows.push(R('น้ำหนักตั้งต้น', startWeight+' kg'));
+  rows.push(R('น้ำหนักปัจจุบัน', curWeight+' kg'));
+  rows.push(R('น้ำหนักเป้าหมาย', p.goalWeight+' kg'));
+  rows.push(R('เพิ่มไปแล้ว', (gained>=0?'+':'')+gained.toFixed(1)+' kg'));
+  rows.push(R('เหลืออีก', (p.goalWeight-curWeight).toFixed(1)+' kg'));
+  rows.push(BLANK);
+
+  // ── SECTION 2: เป้าแคลอรี่
+  rows.push(['=== เป้าแคลอรี่/วัน ===','','','']);
+  rows.push(R('TDEE', tdee+' kcal'));
+  rows.push(R('เป้ากิน (TDEE+400 surplus)', target+' kcal'));
+  rows.push(R('โปรตีนเป้า', protein+' g/วัน'));
+  rows.push(BLANK);
+
+  // ── SECTION 3: น้ำหนัก 30 วันล่าสุด
+  rows.push(['=== น้ำหนัก 30 วันล่าสุด ===','','','']);
+  rows.push(['วันที่','น้ำหนัก (kg)','','']);
+  const last30w = weightEntries.slice(-30);
+  last30w.forEach(([d,v])=>rows.push([d,v,'','']));
+  rows.push(BLANK);
+
+  // ── SECTION 4: สรุปอาหาร 14 วัน
+  rows.push(['=== สรุปอาหาร 14 วันล่าสุด ===','','','']);
+  rows.push(['วันที่','แคลรวม','โปรตีน (g)','เทียบเป้า']);
+  const fLog = data.foodLog || {};
+  const fDates = Object.keys(fLog).sort().slice(-14);
+  fDates.forEach(d=>{
+    const foods = fLog[d]||[];
+    const kcal = foods.reduce((s,f)=>s+f.kcal,0);
+    const prot = foods.reduce((s,f)=>s+(f.p||0),0);
+    const status = kcal>=target?'✅ surplus':(kcal>=tdee?'⚠️ ใกล้พอ':'❌ ขาด');
+    rows.push([d,kcal,prot,status]);
+  });
+  rows.push(BLANK);
+
+  // ── SECTION 5: Workout 15 ครั้งล่าสุด
+  rows.push(['=== Workout 15 ครั้งล่าสุด ===','','','']);
+  rows.push(['วันที่','ท่า','น้ำหนัก x Reps','']);
+  const wkLog = (data.workoutLog||[]).slice(-15);
+  wkLog.forEach(session=>{
+    (session.exercises||[]).forEach(ex=>{
+      const best = ex.sets?.reduce((b,s)=>(!b||(s.weight||0)>(b.weight||0)?s:b),null);
+      if(best) rows.push([session.date,ex.name,(best.weight||0)+'kg x '+(best.reps||0)+'reps','']);
+    });
+  });
+  rows.push(BLANK);
+
+  // ── SECTION 6: นอน + น้ำ 14 วัน
+  rows.push(['=== นอน + น้ำ 14 วันล่าสุด ===','','','']);
+  rows.push(['วันที่','นอน (ชม.)','น้ำ (ml)','']);
+  const sLog = data.sleepLog||{};
+  const wtrLog = data.waterLog||{};
+  const allDates = [...new Set([...Object.keys(sLog),...Object.keys(wtrLog)])].sort().slice(-14);
+  allDates.forEach(d=>rows.push([d,sLog[d]||'',wtrLog[d]||'','']));
+  rows.push(BLANK);
+
+  // ── SECTION 7: คาร์ดิโอ
+  const cLog = (data.cardioLog||[]).slice(-10);
+  if(cLog.length>0){
+    rows.push(['=== คาร์ดิโอ 10 ครั้งล่าสุด ===','','','']);
+    rows.push(['วันที่','ประเภท','นาที','แคล']);
+    cLog.forEach(s=>rows.push([s.date,s.type,s.duration,s.kcal]));
+    rows.push(BLANK);
+  }
+
+  // ── SECTION 8: รอบร่างกาย
+  const mLog = (data.measureLog||[]).slice(0,3);
+  if(mLog.length>0){
+    rows.push(['=== รอบร่างกาย (ล่าสุด 3 ครั้ง) ===','','','']);
+    rows.push(['วันที่','อก','เอว','แขน L']);
+    mLog.forEach(e=>rows.push([e.date,e.chest||'',e.waist||'',e.armL||'']));
+    rows.push(BLANK);
+  }
+
+  rows.push(R('อัพเดทล่าสุด', new Date().toLocaleString('th-TH')));
+
+  if(rows.length) sh.getRange(1,1,rows.length,4).setValues(rows);
+
+  // จัด sheet Summary ให้อยู่หน้าแรก
 }`;
+
+function copySummary() {
+  const profile = DB.get('profile', {});
+  const macro = calcTDEE(profile);
+  const wLog = DB.get('weightLog', {});
+  const fLog = DB.get('foodLog', {});
+  const wkLog = DB.get('workoutLog', []);
+  const sLog = DB.get('sleepLog', {});
+  const wtrLog = DB.get('waterLog', {});
+  const cLog = DB.get('cardioLog', []);
+  const mLog = DB.get('measureLog', []);
+
+  const wKeys = Object.keys(wLog).sort();
+  const curW = wKeys.length ? wLog[wKeys[wKeys.length-1]] : profile.weight;
+
+  let txt = '=== ข้อมูลสุขภาพและการออกกำลังกาย ===\n\n';
+
+  // โปรไฟล์
+  txt += '【โปรไฟล์】\n';
+  txt += `ชื่อ: ${profile.name} | อายุ: ${profile.age} ปี | สูง: ${profile.height} cm\n`;
+  txt += `น้ำหนักตั้งต้น: ${profile.startWeight} kg | ปัจจุบัน: ${curW} kg | เป้า: ${profile.goalWeight} kg\n`;
+  txt += `เพิ่มไปแล้ว: ${(curW - profile.startWeight).toFixed(1)} kg | เหลืออีก: ${(profile.goalWeight - curW).toFixed(1)} kg\n`;
+  txt += `TDEE: ${macro.tdee} kcal | เป้ากิน: ${macro.target} kcal/วัน | โปรตีนเป้า: ${macro.protein} g/วัน\n\n`;
+
+  // น้ำหนัก 30 วัน
+  txt += '【น้ำหนัก 30 วันล่าสุด】\n';
+  const last30w = wKeys.slice(-30);
+  if (last30w.length === 0) txt += 'ยังไม่มีข้อมูล\n';
+  else last30w.forEach(d => { txt += `${d}: ${wLog[d]} kg\n`; });
+  txt += '\n';
+
+  // อาหาร 14 วัน
+  txt += '【อาหาร 14 วันล่าสุด】\n';
+  const fDates = Object.keys(fLog).sort().slice(-14);
+  if (fDates.length === 0) txt += 'ยังไม่มีข้อมูล\n';
+  else fDates.forEach(d => {
+    const kcal = fLog[d].reduce((s, f) => s + f.kcal, 0);
+    const prot = fLog[d].reduce((s, f) => s + (f.p || 0), 0);
+    const status = kcal >= macro.target ? '✅ surplus' : kcal >= macro.tdee ? '⚠️ ใกล้พอ' : '❌ ขาด';
+    txt += `${d}: ${kcal} kcal | โปรตีน ${prot}g | ${status}\n`;
+  });
+  txt += '\n';
+
+  // Workout
+  txt += '【Workout 30 วันล่าสุด】\n';
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const recentWk = wkLog.filter(s => s.date >= cutoffStr);
+  if (recentWk.length === 0) txt += 'ยังไม่มีข้อมูล\n';
+  else recentWk.forEach(session => {
+    txt += `${session.date}: ${(session.exercises || []).length} ท่า\n`;
+    (session.exercises || []).forEach(ex => {
+      const best = ex.sets?.reduce((b, s) => (!b || (s.weight || 0) > (b.weight || 0) ? s : b), null);
+      if (best) txt += `  - ${ex.name}: ${best.weight || 0}kg × ${best.reps || 0} reps\n`;
+    });
+  });
+  txt += '\n';
+
+  // นอน + น้ำ
+  txt += '【นอน + น้ำ 14 วันล่าสุด】\n';
+  const allD = [...new Set([...Object.keys(sLog), ...Object.keys(wtrLog)])].sort().slice(-14);
+  if (allD.length === 0) txt += 'ยังไม่มีข้อมูล\n';
+  else allD.forEach(d => {
+    txt += `${d}: นอน ${sLog[d] || '-'} ชม. | น้ำ ${wtrLog[d] || '-'} ml\n`;
+  });
+  txt += '\n';
+
+  // คาร์ดิโอ
+  if (cLog.length > 0) {
+    txt += '【คาร์ดิโอ 10 ครั้งล่าสุด】\n';
+    cLog.slice(-10).forEach(s => {
+      txt += `${s.date}: ${s.type} ${s.duration} นาที${s.distance ? ` ${s.distance}km` : ''} — ${s.kcal} kcal\n`;
+    });
+    txt += '\n';
+  }
+
+  // รอบร่างกาย
+  if (mLog.length > 0) {
+    txt += '【รอบร่างกายล่าสุด】\n';
+    const m = mLog[0];
+    txt += `วันที่: ${m.date}\n`;
+    if (m.chest) txt += `อก: ${m.chest} cm | `;
+    if (m.waist) txt += `เอว: ${m.waist} cm | `;
+    if (m.armL) txt += `แขน L: ${m.armL} cm | `;
+    if (m.armR) txt += `แขน R: ${m.armR} cm\n`;
+    txt += '\n';
+  }
+
+  txt += `อัพเดท: ${new Date().toLocaleString('th-TH')}`;
+
+  const btn = document.getElementById('copy-summary-btn');
+  const status = document.getElementById('copy-summary-status');
+  navigator.clipboard.writeText(txt).then(() => {
+    btn.textContent = '✅ Copy แล้ว! ไปวางใน Claude Chat ได้เลย';
+    btn.style.background = 'var(--green)';
+    status.style.color = 'var(--green)';
+    status.textContent = 'วางในแชทแล้วพิมพ์ถามได้เลยครับ';
+    setTimeout(() => {
+      btn.textContent = '📋 Copy ข้อมูลสรุปทั้งหมด';
+      btn.style.background = '';
+      status.textContent = '';
+    }, 4000);
+  }).catch(() => {
+    status.style.color = 'var(--red)';
+    status.textContent = 'Copy ไม่ได้ — ลองใช้บน HTTPS (GitHub Pages)';
+  });
+}
 
 function showSheetsSetup() {
   document.getElementById('apps-script-code').textContent = APPS_SCRIPT_CODE;
