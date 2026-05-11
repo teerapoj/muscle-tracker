@@ -1022,7 +1022,11 @@
         </select>
       </div>
     </div>
-    <div class="row">
+    <div class="input-group" style="margin-top:4px">
+      <label>วันออกกำลังกาย</label>
+      <div id="edit-workout-days" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
+    </div>
+    <div class="row" style="margin-top:12px">
       <button class="btn btn-secondary" onclick="closeModal('edit-modal')">ยกเลิก</button>
       <button class="btn btn-primary" onclick="saveEditProfile()">บันทึก</button>
     </div>
@@ -1703,6 +1707,11 @@ function openEditProfile() {
   document.getElementById('edit-goal').value = p.goalWeight;
   document.getElementById('edit-age').value = p.age;
   document.getElementById('edit-activity').value = p.activityFactor;
+  const dayNames = ['อา','จ','อ','พ','พฤ','ศ','ส'];
+  const sel = p.workoutDays || [];
+  document.getElementById('edit-workout-days').innerHTML = dayNames.map((name, i) =>
+    `<span class="tag ${sel.includes(i) ? 'selected' : ''}" onclick="this.classList.toggle('selected')" data-day="${i}">${name}</span>`
+  ).join('');
   document.getElementById('edit-modal').classList.add('open');
 }
 
@@ -1712,6 +1721,8 @@ function saveEditProfile() {
   p.goalWeight = +document.getElementById('edit-goal').value || p.goalWeight;
   p.age = +document.getElementById('edit-age').value || p.age;
   p.activityFactor = +document.getElementById('edit-activity').value || p.activityFactor;
+  const selected = [...document.querySelectorAll('#edit-workout-days .tag.selected')].map(t => +t.dataset.day);
+  if (selected.length > 0) p.workoutDays = selected;
   DB.set('profile', p);
   closeModal('edit-modal');
   renderProfile();
