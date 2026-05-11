@@ -411,9 +411,9 @@
       <div class="prog-fill" id="kcal-prog" style="background:var(--green);width:0%"></div>
     </div>
     <div class="macro-row">
-      <div class="macro-item"><div class="mv" id="dash-protein">0</div><div class="ml">โปรตีน (g)</div></div>
-      <div class="macro-item"><div class="mv" id="dash-carb">0</div><div class="ml">คาร์บ (g)</div></div>
-      <div class="macro-item"><div class="mv" id="dash-fat">0</div><div class="ml">ไขมัน (g)</div></div>
+      <div class="macro-item"><div class="mv" id="dash-protein">0</div><div class="ml">โปรตีน (g)</div><div class="ml" id="dash-protein-target" style="color:var(--muted);font-size:11px"></div></div>
+      <div class="macro-item"><div class="mv" id="dash-carb">0</div><div class="ml">คาร์บ (g)</div><div class="ml" id="dash-carb-target" style="color:var(--muted);font-size:11px"></div></div>
+      <div class="macro-item"><div class="mv" id="dash-fat">0</div><div class="ml">ไขมัน (g)</div><div class="ml" id="dash-fat-target" style="color:var(--muted);font-size:11px"></div></div>
     </div>
   </div>
 
@@ -432,6 +432,10 @@
       <button class="btn-sm" style="background:#0c4a6e;color:#38bdf8;border:1px solid #0369a1" onclick="addWater(500)">+500ml</button>
       <button class="btn-sm" style="background:#0c4a6e;color:#38bdf8;border:1px solid #0369a1" onclick="addWater(750)">+750ml</button>
       <button class="btn-sm btn-secondary" onclick="resetWater()">รีเซ็ต</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+      <input type="number" id="water-custom-input" placeholder="พิมพ์จำนวน ml" min="1" max="5000" style="flex:1" />
+      <button class="btn-sm" style="background:#0c4a6e;color:#38bdf8;border:1px solid #0369a1" onclick="addWaterCustom()">+ เพิ่ม</button>
     </div>
   </div>
 
@@ -1163,6 +1167,9 @@ function renderDashboard() {
   document.getElementById('dash-protein').textContent = pToday;
   document.getElementById('dash-carb').textContent = cToday;
   document.getElementById('dash-fat').textContent = fToday;
+  document.getElementById('dash-protein-target').textContent = 'เป้า ' + macro.protein + 'g';
+  document.getElementById('dash-carb-target').textContent = 'เป้า ' + macro.carb + 'g';
+  document.getElementById('dash-fat-target').textContent = 'เป้า ' + macro.fat + 'g';
   const kpct = Math.min(100, Math.round((kcalToday / macro.target) * 100));
   document.getElementById('kcal-prog').style.width = kpct + '%';
   document.getElementById('kcal-prog').style.background = kpct >= 90 ? 'var(--green)' : kpct >= 60 ? 'var(--yellow)' : 'var(--red)';
@@ -2428,6 +2435,13 @@ function deleteCardio(i) {
 // ══════════════════════════════════════════
 //  WATER INTAKE
 // ══════════════════════════════════════════
+function addWaterCustom() {
+  const input = document.getElementById('water-custom-input');
+  const ml = parseInt(input.value);
+  if (!ml || ml <= 0) return;
+  addWater(ml);
+  input.value = '';
+}
 function addWater(ml) {
   const log = DB.get('waterLog', {});
   log[today()] = (log[today()] || 0) + ml;
