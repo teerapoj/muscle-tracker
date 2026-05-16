@@ -2759,16 +2759,18 @@ function writeSummary(ss, data) {
   rows.push(BLANK);
 
   // ── SECTION 4: สรุปอาหาร 14 วัน
-  rows.push(['=== สรุปอาหาร 14 วันล่าสุด ===','','','']);
-  rows.push(['วันที่','แคลรวม','โปรตีน (g)','เทียบเป้า']);
+  rows.push(['=== สรุปอาหาร 14 วันล่าสุด ===','','','','','']);
+  rows.push(['วันที่','แคลรวม','โปรตีน (g)','คาร์บ (g)','ไขมัน (g)','เทียบเป้า']);
   const fLog = data.foodLog || {};
   const fDates = Object.keys(fLog).sort().slice(-14);
   fDates.forEach(d=>{
     const foods = fLog[d]||[];
     const kcal = foods.reduce((s,f)=>s+f.kcal,0);
     const prot = foods.reduce((s,f)=>s+(f.p||0),0);
+    const carb = foods.reduce((s,f)=>s+(f.c||0),0);
+    const fat  = foods.reduce((s,f)=>s+(f.fat||0),0);
     const status = kcal>=target?'✅ surplus':(kcal>=tdee?'⚠️ ใกล้พอ':'❌ ขาด');
-    rows.push([d,kcal,prot,status]);
+    rows.push([d,kcal,prot,carb,fat,status]);
   });
   rows.push(BLANK);
 
