@@ -2891,8 +2891,10 @@ function copySummary() {
   else fDates.forEach(d => {
     const kcal = fLog[d].reduce((s, f) => s + f.kcal, 0);
     const prot = fLog[d].reduce((s, f) => s + (f.p || 0), 0);
+    const carb = fLog[d].reduce((s, f) => s + (f.c || 0), 0);
+    const fat  = fLog[d].reduce((s, f) => s + (f.fat || 0), 0);
     const status = kcal >= macro.target ? '✅ surplus' : kcal >= macro.tdee ? '⚠️ ใกล้พอ' : '❌ ขาด';
-    txt += `${d}: ${kcal} kcal | โปรตีน ${prot}g | ${status}\n`;
+    txt += `${d}: ${kcal} kcal | โปรตีน ${prot}g | คาร์บ ${carb}g | ไขมัน ${fat}g | ${status}\n`;
   });
   txt += '\n';
 
