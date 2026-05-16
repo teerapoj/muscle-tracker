@@ -2728,12 +2728,11 @@ function writeSummary(ss, data) {
   const gained = curWeight - startWeight;
 
   const rows = [];
-  const H = (t) => [t,'','',''];
-  const R = (k,v) => [k,v,'',''];
-  const BLANK = ['','','',''];
+  const R = (k,v) => [k,v,'','','',''];
+  const BLANK = ['','','','','',''];
 
   // ── SECTION 1: โปรไฟล์
-  rows.push(['=== โปรไฟล์ ===','','','']);
+  rows.push(['=== โปรไฟล์ ===','','','','','']);
   rows.push(R('ชื่อ', p.name||''));
   rows.push(R('อายุ', p.age+' ปี'));
   rows.push(R('ส่วนสูง', p.height+' cm'));
@@ -2745,17 +2744,17 @@ function writeSummary(ss, data) {
   rows.push(BLANK);
 
   // ── SECTION 2: เป้าแคลอรี่
-  rows.push(['=== เป้าแคลอรี่/วัน ===','','','']);
+  rows.push(['=== เป้าแคลอรี่/วัน ===','','','','','']);
   rows.push(R('TDEE', tdee+' kcal'));
   rows.push(R('เป้ากิน (TDEE+400 surplus)', target+' kcal'));
   rows.push(R('โปรตีนเป้า', protein+' g/วัน'));
   rows.push(BLANK);
 
   // ── SECTION 3: น้ำหนัก 30 วันล่าสุด
-  rows.push(['=== น้ำหนัก 30 วันล่าสุด ===','','','']);
-  rows.push(['วันที่','น้ำหนัก (kg)','','']);
+  rows.push(['=== น้ำหนัก 30 วันล่าสุด ===','','','','','']);
+  rows.push(['วันที่','น้ำหนัก (kg)','','','','']);
   const last30w = weightEntries.slice(-30);
-  last30w.forEach(([d,v])=>rows.push([d,v,'','']));
+  last30w.forEach(([d,v])=>rows.push([d,v,'','','','']));
   rows.push(BLANK);
 
   // ── SECTION 4: สรุปอาหาร 14 วัน
@@ -2775,47 +2774,47 @@ function writeSummary(ss, data) {
   rows.push(BLANK);
 
   // ── SECTION 5: Workout 15 ครั้งล่าสุด
-  rows.push(['=== Workout 15 ครั้งล่าสุด ===','','','']);
-  rows.push(['วันที่','ท่า','น้ำหนัก x Reps','']);
+  rows.push(['=== Workout 15 ครั้งล่าสุด ===','','','','','']);
+  rows.push(['วันที่','ท่า','น้ำหนัก x Reps','','','']);
   const wkLog = (data.workoutLog||[]).slice(-15);
   wkLog.forEach(session=>{
     (session.exercises||[]).forEach(ex=>{
       const best = ex.sets?.reduce((b,s)=>(!b||(s.weight||0)>(b.weight||0)?s:b),null);
-      if(best) rows.push([session.date,ex.name,(best.weight||0)+'kg x '+(best.reps||0)+'reps','']);
+      if(best) rows.push([session.date,ex.name,(best.weight||0)+'kg x '+(best.reps||0)+'reps','','','']);
     });
   });
   rows.push(BLANK);
 
   // ── SECTION 6: นอน + น้ำ 14 วัน
-  rows.push(['=== นอน + น้ำ 14 วันล่าสุด ===','','','']);
-  rows.push(['วันที่','นอน (ชม.)','น้ำ (ml)','']);
+  rows.push(['=== นอน + น้ำ 14 วันล่าสุด ===','','','','','']);
+  rows.push(['วันที่','นอน (ชม.)','น้ำ (ml)','','','']);
   const sLog = data.sleepLog||{};
   const wtrLog = data.waterLog||{};
   const allDates = [...new Set([...Object.keys(sLog),...Object.keys(wtrLog)])].sort().slice(-14);
-  allDates.forEach(d=>rows.push([d,sLog[d]||'',wtrLog[d]||'','']));
+  allDates.forEach(d=>rows.push([d,sLog[d]||'',wtrLog[d]||'','','','']));
   rows.push(BLANK);
 
   // ── SECTION 7: คาร์ดิโอ
   const cLog = (data.cardioLog||[]).slice(-10);
   if(cLog.length>0){
-    rows.push(['=== คาร์ดิโอ 10 ครั้งล่าสุด ===','','','']);
-    rows.push(['วันที่','ประเภท','นาที','แคล']);
-    cLog.forEach(s=>rows.push([s.date,s.type,s.duration,s.kcal]));
+    rows.push(['=== คาร์ดิโอ 10 ครั้งล่าสุด ===','','','','','']);
+    rows.push(['วันที่','ประเภท','นาที','แคล','','']);
+    cLog.forEach(s=>rows.push([s.date,s.type,s.duration,s.kcal,'','']));
     rows.push(BLANK);
   }
 
   // ── SECTION 8: รอบร่างกาย
   const mLog = (data.measureLog||[]).slice(0,3);
   if(mLog.length>0){
-    rows.push(['=== รอบร่างกาย (ล่าสุด 3 ครั้ง) ===','','','']);
-    rows.push(['วันที่','อก','เอว','แขน L']);
-    mLog.forEach(e=>rows.push([e.date,e.chest||'',e.waist||'',e.armL||'']));
+    rows.push(['=== รอบร่างกาย (ล่าสุด 3 ครั้ง) ===','','','','','']);
+    rows.push(['วันที่','อก','เอว','แขน L','','']);
+    mLog.forEach(e=>rows.push([e.date,e.chest||'',e.waist||'',e.armL||'','','']));
     rows.push(BLANK);
   }
 
   rows.push(R('อัพเดทล่าสุด', new Date().toLocaleString('th-TH')));
 
-  if(rows.length) sh.getRange(1,1,rows.length,4).setValues(rows);
+  if(rows.length) sh.getRange(1,1,rows.length,6).setValues(rows);
 
   // จัด sheet Summary ให้อยู่หน้าแรก
 }`;
